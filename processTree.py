@@ -7,6 +7,8 @@
 
 import pandas as pd
 #import subprocess
+from Payload import Payload
+
 
 def computeCutoff(feature, data):
 	bestCutoff = 0
@@ -14,12 +16,13 @@ def computeCutoff(feature, data):
 	lessFalse = True
 	for index, row in data.iterrows():
 		cutoff = row[feature]
+		# print "init cutoff: " + str(cutoff)
 
 		j, lessFalse = getJ(cutoff, feature, data)
 		if(j > bestJ):
+			# print "bestCutoff: " + str(bestCutoff)
 			bestCutoff = cutoff
 			bestJ = j
-	#print "bestCutoff: " + str(bestCutoff)
 	return bestCutoff, lessFalse
 
 def getJ(cutoff, feature, data):
@@ -40,20 +43,24 @@ def getJ(cutoff, feature, data):
 		else:
 			num4 += 1
 
-	#print "cutoff: " + str(cutoff)
+	## print "cutoff: " + str(cutoff)
 
-	#print "num1: " + str(num1)
-	#print "num2: " + str(num2)
-	#print "num3: " + str(num3)
-	#print "num4: " + str(num4)
+	## print "num1: " + str(num1)
+	## print "num2: " + str(num2)
+	## print "num3: " + str(num3)
+	## print "num4: " + str(num4)
 
-	if(num4 + num2 == 0 or num1 + num3 == 0): return -2, False
+	if(num4 + num2 == 0 or num1 + num3 == 0):
+		print "error"
+		return -2, False
 
 	j1 = num4 / ((num4 + num2) * 1.0) + num1 / ((num1 + num3) * 1.0) - 1.0
 	j2 = num2 / ((num2 + num4) * 1.0) + num3 / ((num1 + num3) * 1.0) - 1.0
 
-	#print "j1: " + str(j1)
-	#print "j2: " + str(j2)
+	# print "j1: " + str(j1)
+	# print "j2: " + str(j2)
+	# print "((num4 + num2) * 1.0): " + str(((num4 + num2) * 1.0))
+	# print "((num1 + num3) * 1.0): " + str((num1 + num3) * 1.0)
 
 	if(j1>j2):
 		return j1, True
@@ -68,23 +75,32 @@ def processTree(featureOrientation, data):
 	if(False): # return preprocessed (stored) heap
 		return False
 	length = 7 # arbritrary but for our case is 7
-	cutoffs = [-1] * length  # stores cutoffs of each feature
-	getCutoffs(0, length, data, featureOrientation, cutoffs) # stores cutoffs in cutoffs
-	return cutoffs;
+	cutoffPayloads = [Payload() for i in range(length)] # stores cutoffs of each feature
+	getCutoffs(0, length, data, data.shape[0], featureOrientation, cutoffPayloads) # stores cutoffs in cutoffs
+	# print "cutoff: " + str(cutoffPayloads[0].cutoff);
+	return cutoffPayloads;
 
-# getCutoffs(index, length, data, featureOrientation, cutoffs) determines cutoff (and children cutoffs)
+# getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads) determines cutoff (and children cutoffs)
 # 	 based on featureOrientation at index
 # side effect: updates cutoffs
-def getCutoffs(index, length, data, featureOrientation, cutoffs):
+def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads):
 	if(index < length and featureOrientation[index] != None):
-		cutoffs[index], lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
-		#print "cutoff: " + str(cutoffs[index])
-		leftData = filterData(featureOrientation[index], cutoffs[index], data.copy(), True)
-		rightData = filterData(featureOrientation[index], cutoffs[index], data.copy(), False) # filtered data to cutoff
+		cutoffPayloads[index].cutoff, lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
 
-		getCutoffs(2 * index + 1, length, leftData, featureOrientation, cutoffs) # compute cutoff for left child
-		getCutoffs(2 * index + 2, length, rightData, featureOrientation, cutoffs) # compute cutoff for right child
-	elif(index < length and featureOrientation[index] == None): cutoffs[index] = None
+		# print cutoffPayloads[index].cutoff;
+		# check if children need to be evaluated
+		if(2 * index + 1 < length):
+			leftData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data.copy(), True)
+			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0); # determine abs weight
+			getCutoffs(2 * index + 1, length, leftData, dataSize, featureOrientation, cutoffPayloads)  # compute cutoff for left child
+		if(2 * index + 2 < length):
+			rightData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data.copy(),
+								   False)  # filtered data to cutoff
+			cutoffPayloads[2 * index + 2].absoluteWeight = rightData.shape[0] / (dataSize * 1.0);  # determine abs weight
+			getCutoffs(2 * index + 2, length, rightData, dataSize, featureOrientation, cutoffPayloads) # compute cutoff for right child
+	elif(index < length and featureOrientation[index] == None): cutoffPayloads[index] = None
+
+
 # filterData(feature, cutoff, data) filters data based on the feature (index)
 def filterData(feature, cutoff, data, getSmaller):
 	for row_index, row in data.iterrows():
@@ -94,7 +110,6 @@ def filterData(feature, cutoff, data, getSmaller):
 		else:
 			if(row[feature] < cutoff):
 				data.drop(row_index, inplace=True)
-
 	return data;
 
 def main():
@@ -104,11 +119,13 @@ def main():
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
 
-		featureOrientation = [2, None, 0, 2, 3, 1, None]
-		cutoffs = processTree(featureOrientation, data)
+		featureOrientation = [0, 1, 2, 2, 3, 1, 3]
+		payloads = processTree(featureOrientation, data)
 
-		for cutoffValue in cutoffs:
-			print cutoffValue
+		for payload in payloads:
+			if(payload != None):
+				print "Cutoff: " + str(payload.cutoff)
+				print "Absolute weight: " + str(payload.absoluteWeight)
 
 		break
 main()
