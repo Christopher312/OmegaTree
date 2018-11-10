@@ -1,14 +1,16 @@
 # preliminary, probably not right
 
 '''
-	0 - Iris-versicolor
-	1 - Iris-virginica
+	1 - Iris-versicolor (red)
+	2 - Iris-virginica (green)
 '''
 
 import pandas as pd
 #import subprocess
 from Payload import Payload
 
+VERSICOLOR = 1
+VIRGINICA = 2
 
 def computeCutoff(feature, data):
 	bestCutoff = 0
@@ -77,20 +79,22 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 		if(2 * index + 2 < length):
 			leftData, rightData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data)
 
+			# set dominant trait
 			if(leftData.shape[0] >= rightData.shape[0]):
-				cutoffPayloads[2 * index + 1].classification = 0
-				cutoffPayloads[2 * index + 2].classification = 1
+				cutoffPayloads[2 * index + 1].classification = VERSICOLOR
+				cutoffPayloads[2 * index + 2].classification = VIRGINICA
 			else:
-				cutoffPayloads[2 * index + 1].classification = 1
-				cutoffPayloads[2 * index + 2].classification = 0
+				cutoffPayloads[2 * index + 1].classification = VIRGINICA
+				cutoffPayloads[2 * index + 2].classification = VERSICOLOR
 
-			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0); # determine abs weight
-			cutoffPayloads[2 * index + 2].absoluteWeight = rightData.shape[0] / (dataSize * 1.0);  # determine abs weight
+			# set weight
+			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0);
+			cutoffPayloads[2 * index + 2].absoluteWeight = rightData.shape[0] / (dataSize * 1.0);
+
 			getCutoffs(2 * index + 1, length, leftData,
 					   dataSize, featureOrientation, cutoffPayloads)  # compute cutoff for left child
 			getCutoffs(2 * index + 2, length, rightData,
 					   dataSize, featureOrientation, cutoffPayloads) # compute cutoff for right child
-	elif(index < length and featureOrientation[index] == None): cutoffPayloads[index] = None
 
 
 # filterData(feature, cutoff, data) filters data based on the feature (index)
@@ -105,16 +109,6 @@ def filterData(feature, cutoff, data):
 				rightData.drop(row_index, inplace=True)
 	return leftData, rightData;
 
-# setDominantFeature(cutoffPayload, count, size) sets the dominant type (> 50%) of the payload attribute
-def setDominantFeature(cutoffPayload, count, size, getSmaller):
-	if(getSmaller and (size - count) / (size * 1.0) > count / (size * 1.0)
-	   or ((not getSmaller) and (size - count) / (size * 1.0) <= count / (size * 1.0))):
-		# small is not dominant trait, use the latter
-		cutoffPayload.classification = 1 # the more dominant trait
-	else:
-		# small is dominant trait
-		cutoffPayload.classification = 0 # the more dominant trait
-
 def main():
 	data = pd.read_csv("iris.csv", encoding = "utf-8")
 
@@ -122,16 +116,16 @@ def main():
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
 
-		featureOrientation = [0, 1, 2, 2, 3, 1, 3]
+		featureOrientation = [0, 1, None, 2, 3, 1, 3]
 		payloads = processTree(featureOrientation, data)
 
 		# last 4 are the leaves
 		for payload in payloads:
+			print "-------------------------"
 			if(payload != None):
-				print "-------------------------"
 				print "Cutoff: " + str(payload.cutoff)
 				print "Absolute weight: " + str(payload.absoluteWeight)
 				print "Classification: " + str(payload.classification)
-				print "-------------------------"
+			print "-------------------------"
 		break
 main()
