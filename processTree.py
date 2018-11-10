@@ -34,11 +34,11 @@ def getJ(cutoff, feature, data):
 	num4 = 0
 
 	for index, row in data.iterrows():
-		if(row[feature] < cutoff and row[len(row)-1] == 0):
+		if(row[feature] < cutoff and row[len(row)-1] == VERSICOLOR):
 			num1 += 1
-		elif(row[feature] < cutoff and row[len(row)-1] == 1):
+		elif(row[feature] < cutoff and row[len(row)-1] == VIRGINICA):
 			num2 += 1
-		elif(row[feature] >= cutoff and row[len(row)-1] == 0):
+		elif(row[feature] >= cutoff and row[len(row)-1] == VERSICOLOR):
 			num3 += 1
 		else:
 			num4 += 1
@@ -88,6 +88,8 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 				cutoffPayloads[2 * index + 2].classification = VERSICOLOR
 
 			# set weight
+			print "size of left data: " + str(leftData.shape[0])
+			print "size of right data: " + str(rightData.shape[0])
 			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0);
 			cutoffPayloads[2 * index + 2].absoluteWeight = rightData.shape[0] / (dataSize * 1.0);
 
