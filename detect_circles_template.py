@@ -61,40 +61,76 @@ def circle_helper(oriimg):
 
 #ensure at least some circles were found
 if circles is not None:
+        def sortGoodCircles(x,y,r,i):
+            return (y^3+x,i)
 	# convert the (x, y) coordinates and radius of the circles to integers
 	circles = np.round(circles[0, :]).astype("int")
  
 	# loop over the (x, y) coordinates and radius of the circles
 	radiusList = []
-        for (x, y, r) in circles:
+        for i in range(len(circles)):
+                x = circles[i][0]
+                y = circles[i][1]
+                r = circles[i][2]
 		# draw the circle in the output image, then draw a rectangle
 		# corresponding to the center of the circle
                 print "radius: ", r, ", x: ", x,", y:", y
                 
-                radiusList.append(sortFunction(r,x,y))
+                radiusList.append((sortFunction(r,x,y),i))
 		#cv2.circle(output, (x, y), r, (0, 255, 0), 4)
 		#cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
         radiusList.sort()
-        print "circles master list: ", circles
-        goodCircleList = []
-        counter = 0
- 	for (x, y, r) in circles:
-		# draw the circle in the output image, then draw a rectangle
-		# corresponding to the center of the circle
-                if (sortFunction(r,x,y)<=radiusList[6]):
-		  cv2.putText(output, str(r)+","+str(x)+","+str(y), (x,y),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
-                  cv2.circle(output, (x, y), r, (0, 255, 0), 4)
-		  cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
-                  cv2.rectangle(output, (x - r, y - r), (x + r, y + r), (0, 128, 255), 4)
-                  
-                  crop1 = image[ y-r+10:y+r-10, x-r+10:x+r-10]
-                  cv2.imwrite("crop"+str(counter)+".jpg", crop1)
-	          print "working on crop ",counter
-                  numCircles = circle_helper(crop1)
-                  cv2.putText(output, "numCircles:"+str(numCircles), (x,y+20),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
-                  counter = counter+1    
-	# show the output image
+        goodCircleList = radiusList[:7]
+        print "goodCircleList:", goodCircleList, " has length: ", len(goodCircleList)
+      
+        def newCircleMapY((value, index)):
+            y = circles[index][1]
+            return (y,index)
+        def newCircleMapX((value, index)):
+            x = circles[index][0]
+            return (x,index)
         
+        goodCircleList2 = [newCircleMapY(x) for x in goodCircleList]
+        goodCircleList2.sort()
+        print "goodCircleList2: ", goodCircleList2
+        featureList = []
+ 	#top most node
+        
+        goodCircleListFinal=[goodCircleList2[0]]
+        temp1 = goodCircleList2[1]
+        temp2 = goodCircleList2[2]
+        if (circles[temp1[1]][0]<circles[temp2[1]][0]): #temp1 has a smaller x value
+            goodCircleListFinal.append(temp1)
+            goodCircleListFinal.append(temp2)
+        else:
+            goodCircleListFinal.append(temp2)
+            goodCircleListFinal.append(temp1)
+        goodCircleList2 = goodCircleList2[3:]
+        print  "this should have length 4: ", len(goodCircleList2)
+        goodCircleList2 = [newCircleMapX(x) for x in goodCircleList2]
+        goodCircleList2.sort() 
+        goodCircleListFinal = goodCircleListFinal + goodCircleList2
+
+        for i in range(len(goodCircleListFinal)):
+            # draw the circle in the output image, then draw a rectangle
+            # corresponding to the center of the circle
+            x = circles[(goodCircleListFinal[i])[1]][0]  #i[1] is the index of the circle
+            y = circles[(goodCircleListFinal[i])[1]][1]
+            r = circles[(goodCircleListFinal[i])[1]][2]
+
+            cv2.putText(output, str(r)+","+str(x)+","+str(y), (x,y),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
+            cv2.circle(output, (x, y), r, (0, 255, 0), 4)
+            cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
+            cv2.rectangle(output, (x - r, y - r), (x + r, y + r), (0, 128, 255), 4)
+
+            crop1 = image[ y-r+10:y+r-10, x-r+10:x+r-10]
+            cv2.imwrite("crop"+str(i)+".jpg", crop1)
+            print "working on crop ",i
+            tempFeature = 1#circle_helper(crop1)
+            featureList.append(tempFeature)
+            cv2.putText(output, "circle "+str(i)+", value: "+str(goodCircleListFinal[0])+", featureType:"+str(tempFeature), (x,y+20),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
+        
+        # show the output image
         cv2.imwrite("detect_circles_img.jpg", image)
 	print "wrote image"
         cv2.imshow("output", np.hstack([image, output]))
