@@ -10,7 +10,7 @@ import cv2
 
 # load the image, clone it for output, and then convert it to grayscale
 #filename = 'images/circleTest.jpg'
-filename = 'newCircleTest7.jpg'
+filename = 'newCircleTest8.jpg'
 W = 1000.
 oriimg = cv2.imread(filename,cv2.CV_LOAD_IMAGE_COLOR)
 height, width, depth = oriimg.shape
@@ -50,6 +50,7 @@ def circle_helper(oriimg):
  
     templateResult = []
     templates = ["mask0.png", "mask1.png", "mask2.png", "mask3.png", "mask4.png"]
+    resultList = []
     for i in range(len(templates)):
         loc = findLoc(image, templates[i], 0.5)
         templateResult.append(loc)
@@ -57,8 +58,12 @@ def circle_helper(oriimg):
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(loc)
         print "template ",i
         print "max_val", max_val
-
-
+        resultList.append((-1*max_val,i))
+    resultList.sort()
+      
+    resultFeature = resultList[0][1]
+    print "resultFeature: ", resultFeature
+    return resultFeature
 #ensure at least some circles were found
 if circles is not None:
         def sortGoodCircles(x,y,r,i):
@@ -75,10 +80,7 @@ if circles is not None:
 		# draw the circle in the output image, then draw a rectangle
 		# corresponding to the center of the circle
                 print "radius: ", r, ", x: ", x,", y:", y
-                
                 radiusList.append((sortFunction(r,x,y),i))
-		#cv2.circle(output, (x, y), r, (0, 255, 0), 4)
-		#cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
         radiusList.sort()
         goodCircleList = radiusList[:7]
         print "goodCircleList:", goodCircleList, " has length: ", len(goodCircleList)
@@ -95,7 +97,6 @@ if circles is not None:
         print "goodCircleList2: ", goodCircleList2
         featureList = []
  	#top most node
-        
         goodCircleListFinal=[goodCircleList2[0]]
         temp1 = goodCircleList2[1]
         temp2 = goodCircleList2[2]
@@ -117,19 +118,17 @@ if circles is not None:
             x = circles[(goodCircleListFinal[i])[1]][0]  #i[1] is the index of the circle
             y = circles[(goodCircleListFinal[i])[1]][1]
             r = circles[(goodCircleListFinal[i])[1]][2]
-
             cv2.putText(output, str(r)+","+str(x)+","+str(y), (x,y),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
             cv2.circle(output, (x, y), r, (0, 255, 0), 4)
             cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
             cv2.rectangle(output, (x - r, y - r), (x + r, y + r), (0, 128, 255), 4)
-
             crop1 = image[ y-r+10:y+r-10, x-r+10:x+r-10]
             cv2.imwrite("crop"+str(i)+".jpg", crop1)
-            print "working on crop ",i
-            tempFeature = 1#circle_helper(crop1)
+            print "working on node ",i
+            tempFeature = circle_helper(crop1)
             featureList.append(tempFeature)
-            cv2.putText(output, "circle "+str(i)+", value: "+str(goodCircleListFinal[0])+", featureType:"+str(tempFeature), (x,y+20),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
-        
+            cv2.putText(output, "circle "+str(i)+", value: "+str(goodCircleListFinal[0]), (x,y+20),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
+            cv2.putText(output,"Ty:"+str(tempFeature), (x,y+40), cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2)
         # show the output image
         cv2.imwrite("detect_circles_img.jpg", image)
 	print "wrote image"
