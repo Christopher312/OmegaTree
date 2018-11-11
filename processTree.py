@@ -4,13 +4,23 @@
 	1 - Iris-versicolor (red)
 	2 - Iris-virginica (green)
 '''
-
+import pickle
 import pandas as pd
-#import subprocess
+import subprocess
+import serial
+import serial.tools.list_ports
+import os.path
+
+from PayloadWrapperList import PayloadWrapperList
+from StoragePayloadWrapper import StoragePayloadWrapper
 from Payload import Payload
 
+DATA_FILE = "iris.csv"
+STORAGE_FILE = "preprocessed_data.txt"
+BRIGHTNESS_SCALE = 9
 VERSICOLOR = 1
 VIRGINICA = 2
+NUM_NODES = 7
 
 def computeCutoff(feature, data):
 	bestCutoff = 0
@@ -44,7 +54,7 @@ def getJ(cutoff, feature, data):
 			num4 += 1
 
 	if(num4 + num2 == 0 or num1 + num3 == 0):
-		print "error"
+		#print "error"
 		return -2, False
 
 	j1 = num4 / ((num4 + num2) * 1.0) + num1 / ((num1 + num3) * 1.0) - 1.0
@@ -54,17 +64,68 @@ def getJ(cutoff, feature, data):
 		return j1, True
 	return j2, False
 
+# getFeatureOrientationKey(featureOrientation) creates simple key to identify unique orientation
+def getFeatureOrientationKey(featureOrientation):
+	featureOrientationKey = str(featureOrientation[0])
+	SPLITTER = ","
+	for index, feature in enumerate(featureOrientation):
+		if (index == NUM_NODES): break
+		if (index > 0):
+			featureOrientationKey = featureOrientationKey + SPLITTER + str(feature)
+		# the last 8 None are just to make it easier to use algorithm
+
+	return featureOrientationKey
+
+# getOrientationFromFile(featureOrientation) gets the payloads from file
+# return payloads from file or None if nothing is there
+def getOrientationFromFile(featureOrientation):
+	if os.path.isfile(STORAGE_FILE):
+		with open(STORAGE_FILE, "rb") as fp:
+			storageWrappers = pickle.load(fp)
+		if(storageWrappers == None): return None
+
+		featureOrientationKey = getFeatureOrientationKey(featureOrientation)
+		for storageWrapper in storageWrappers.payloadWrappers:
+			if (storageWrapper.featureOrientationKey == featureOrientationKey):
+				print "found payloads"
+				return storageWrapper.payloads
+
+	return None
+
+# storeNewPayloads(cutoffPayloads, featureOrientation) stores new cutoffPayloads to file and uses featureOrientation to create key
+def storeNewPayloads(cutoffPayloads, featureOrientation):
+	storageWrappers = PayloadWrapperList()
+	storageWrappers.payloadWrappers = []
+	if os.path.isfile(STORAGE_FILE):
+		with open(STORAGE_FILE, "rb") as fp:
+			storageWrappers = pickle.load(fp)
+
+	# create new element to add to file
+	payloadWrapper = StoragePayloadWrapper()
+	payloadWrapper.featureOrientationKey = getFeatureOrientationKey(featureOrientation)
+	payloadWrapper.payloads = cutoffPayloads
+
+	# store in list
+	storageWrappers.payloadWrappers.append(payloadWrapper)
+
+	with open(STORAGE_FILE, "wb") as fp:
+		pickle.dump(storageWrappers, fp)
+
 # processTree(featureOrientation, data) returns heap of cutoff values indexed corresponding to featureOrientation
 # 	based on data
 #	assumption: binary tree
 #	assumption: featureOrientation stores features as the indices in the data
 #	return: heap of cutoff values
 def processTree(featureOrientation, data):
-	if(False): # return preprocessed (stored) heap
-		return False
-	length = 7 # arbritrary but for our case is 7
+	cutoffPayloads = getOrientationFromFile(featureOrientation)
+	if(cutoffPayloads != None): return cutoffPayloads
+
+	# orientation not found, must create
+	length = len(featureOrientation) # arbritrary but for our case is 15
 	cutoffPayloads = [Payload() for i in range(length)] # stores cutoffs of each feature
 	getCutoffs(0, length, data, data.shape[0], featureOrientation, cutoffPayloads) # stores cutoffs in cutoffs
+
+	storeNewPayloads(cutoffPayloads, featureOrientation)
 
 	return cutoffPayloads;
 
@@ -88,8 +149,6 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 				cutoffPayloads[2 * index + 2].classification = VERSICOLOR
 
 			# set weight
-			print "size of left data: " + str(leftData.shape[0])
-			print "size of right data: " + str(rightData.shape[0])
 			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0);
 			cutoffPayloads[2 * index + 2].absoluteWeight = rightData.shape[0] / (dataSize * 1.0);
 
@@ -110,24 +169,52 @@ def filterData(feature, cutoff, data):
 			else:
 				rightData.drop(row_index, inplace=True)
 	return leftData, rightData;
+'''
+# sendToArduino(payloads) sends information from the payloads to the arduino
+def sendToArduino(payloads):
 
+	# get serial port being used
+	ports = list(serial.tools.list_ports.comports())
+	hiddenSerial = '855393139313517121F1'
+	arduino = [p[0] for p in ports if (hiddenSerial in p[2])]
+	ser = serial.Serial(arduino[0], timeout=0)
+
+	# begin writing to serial port
+	ser.write(b's') # start bit
+
+	print "-------------------------"
+	print "Sending weights"
+	# send weights (brightness)
+	for index, payload in enumerate(payloads):
+		if(index != 0):
+			print "Absolute weight (scaled by 9): " + str(BRIGHTNESS_SCALE * payload.absoluteWeight)
+			ser.write(str(payload.absoluteWeight * BRIGHTNESS_SCALE).encode())
+
+	print "-------------------------"
+	print "Sending classifications"
+
+	# send classifications of nodes
+	for index, payload in enumerate(payloads):
+		if(index != 0):
+			print "Classification: " + str(payload.classification)
+			ser.write(str(payload.classification))
+
+	print "-------------------------"
+
+	ser.write(b'e') # end bit
+'''
 def main():
-	data = pd.read_csv("iris.csv", encoding = "utf-8")
+	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
 
 	while(True):
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
 
-		featureOrientation = [0, 1, None, 2, 3, 1, 3]
+		featureOrientation = [0, 1, 2, 1, 3, 1, 4, None, None, None, None, None, None, None, None]
+
 		payloads = processTree(featureOrientation, data)
 
-		# last 4 are the leaves
-		for payload in payloads:
-			print "-------------------------"
-			if(payload != None):
-				print "Cutoff: " + str(payload.cutoff)
-				print "Absolute weight: " + str(payload.absoluteWeight)
-				print "Classification: " + str(payload.classification)
-			print "-------------------------"
+		# sendToArduino(payloads)
 		break
+
 main()
