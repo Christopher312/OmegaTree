@@ -31,10 +31,11 @@ def findLoc(imgName, template, threshold):
     return loc
 
 def processImg(imgName):
-    templates = ["A.JPG", "B.JPG", "C.JPG", "D.JPG"]
+    templates = ["mask0.png", "mask1.png", "mask2.png", "mask3.png", "mask4.png", "mask5.png", "mask6.png",
+      "mask7.png"]
     branches = [None] * 7
     for i in range(len(templates)):
-        loc = findLoc(imgName, templates[i], 0.65)
+        loc = findLoc(imgName, templates[i], 0.5)
         for pt in zip(*loc[::-1]):
             x = pt[0]
             y = pt[1]
@@ -54,4 +55,4 @@ def processImg(imgName):
                 branches[6] = i
     return branches
 
-print(processImg("IMG_MANY.JPG"))
+print(processImg("maskTest.jpeg"))
