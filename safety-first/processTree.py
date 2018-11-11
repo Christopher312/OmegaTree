@@ -150,22 +150,10 @@ def processTree(featureOrientation, data):
 # countSuccesses(data, payloads) increments successes based on number of successfuly guessed classifications
 def countSuccesses(data, payloads, featureOrientation, index):
 	global SUCCESSES
-	for row_index, row in data.iterrows():
-		if(row[len(row) - 1] == payloads[index].classification):
-			SUCCESSES = SUCCESSES + 1
-
-# isLeaf(featureOrientation, index) checks if leaf node
-def isLeaf(featureOrientation, index):
-	return featureOrientation[index] == None
-
-# classifyNode(cutoffPayloads, index) classifies node based on dominant trait 
-def classifyNode(cutoffPayloads, index, leftData, rightData):
-	if(leftData.shape[0] >= rightData.shape[0]):
-		cutoffPayloads[2 * index + 1].classification = VERSICOLOR
-		cutoffPayloads[2 * index + 2].classification = VIRGINICA
-	else:
-		cutoffPayloads[2 * index + 1].classification = VIRGINICA
-		cutoffPayloads[2 * index + 2].classification = VERSICOLOR
+	if(featureOrientation[index] == None):
+		for row_index, row in data.iterrows():
+			if(row[len(row) - 1] == payloads[index].classification):
+				SUCCESSES = SUCCESSES + 1
 
 # getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads) determines cutoff (and children cutoffs)
 # 	 based on featureOrientation at index
@@ -178,15 +166,18 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 		if(2 * index + 2 < length):
 			leftData, rightData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data)
 
-			# check if either children is a leaf 
-			if(isLeaf(featureOrientation, 2 * index + 1)):
-				# counts the number of successfuly guessed classifications	
-				countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
-				classifyNode(cutoffPayloads, index, leftData, rightData)
-			if(isLeaf(featureOrientation, 2 * index + 2)):
-				countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
-				classifyNode(cutoffPayloads, index, leftData, rightData)
-			
+			# set dominant trait
+			if(leftData.shape[0] >= rightData.shape[0]):
+				
+				cutoffPayloads[2 * index + 1].classification = VERSICOLOR
+				cutoffPayloads[2 * index + 2].classification = VIRGINICA
+			else:
+				cutoffPayloads[2 * index + 1].classification = VIRGINICA
+				cutoffPayloads[2 * index + 2].classification = VERSICOLOR
+		
+			# does two things: check if it is a leaf node, and if it is, counts the number of successfuly guessed classifications	
+			countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
+			countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
 
 			# set weight
 			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0);
@@ -244,31 +235,12 @@ def sendToMasterArduino(payloads):
 # sentToAccuracyArduino(accuracy) sends accuracy report to Arduino Uno
 def sendToAccuracyArduino(accuracy):
 
-	NUM_DIGITS = 4 # standardize number of digits
-
 	print("-------------------------")
 
 	print("Sending accuracy")
-	print("Accuracy: " + str(accuracy)) # precision to 2 decimal pllaces
-
-	accuracy = accuracy * 100 # scale by 100 to be in percent
-
-	if(float(accuracy) >= 100): accuracy = str(99.00)
-	if(float(accuracy) < 10): accuracy = str(0) + str(accuracy)
-
-	numDigits = 0
-	for index, digit in enumerate(str(accuracy)):
-		if(numDigits < NUM_DIGITS):
-			if(digit != '.'):
-				ser.write(digit.encode())
-				print ("Digit: " + str(numDigits) + " -> " + str(digit))
-				numDigits = numDigits + 1
-
-	if(numDigits < NUM_DIGITS): # number of digits to have at end
-		for index in range(0, NUM_DIGITS - numDigits):
-			print ("Digit: " + str(numDigits) + " -> " + str(0))
-			numDigits = numDigits + 1
-			ser.write(str(0).encode())
+	print("Accuracy: %.2f" %accuracy) # precision to 2 decimal pllaces
+	if(accuracy >= 1): accuracy = 0.99
+	ser.write(("%.2f" %(accuracy * 100)).encode()) # scale for percent
 
 	print("-------------------------")
 

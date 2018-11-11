@@ -1,4 +1,4 @@
 class Payload:
     cutoff = 0
     absoluteWeight = 0
-    classification = -1
+    classification = 0
