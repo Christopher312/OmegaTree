@@ -24,7 +24,7 @@ VIRGINICA = 2
 NUM_NODES = 7
 
 SUCCESSES = 0
-'''
+
 ports = list(serial.tools.list_ports.comports())
 
 hiddenSerial = '557353237353514072A1'
@@ -35,7 +35,7 @@ ser = serial.Serial(arduino[0], timeout=0)
 
 arduinoAccuracy = [p[0] for p in ports if (arduinoAccuracyHiddenSerial in p[2])]
 arduinoAccuracySer = serial.Serial(arduinoAccuracy[0], timeout=0)
-'''
+
 # to find the serial number...
 #for p in ports:
 #	print(p[2])
@@ -220,10 +220,6 @@ def filterData(feature, cutoff, data):
 
 # sendToMasterArduino(payloads) sends information from the payloads to the arduino
 def sendToMasterArduino(payloads):
-	# ser = serial.Serial('com3', 9600)
-	# time.sleep(2) # allow serial communication to establish
-
-	# get serial port being used
 
 	# begin writing to serial port
 	print('begin to write') 
@@ -235,7 +231,7 @@ def sendToMasterArduino(payloads):
 	for index, payload in enumerate(payloads):
 		if(index != 0):
 			print("Absolute weight (scaled by 9): " + str(BRIGHTNESS_SCALE * payload.absoluteWeight))
-			#ser.write(str(int(payload.absoluteWeight * BRIGHTNESS_SCALE)).encode())
+			ser.write(str(int(payload.absoluteWeight * BRIGHTNESS_SCALE)).encode())
 
 	print("-------------------------")
 	print("Sending classifications")
@@ -244,12 +240,12 @@ def sendToMasterArduino(payloads):
 	for index, payload in enumerate(payloads):
 		if(index != 0):
 			print("Classification: " + str(payload.classification))
-			#ser.write(str(payload.classification).encode())
+			ser.write(str(payload.classification).encode())
 
 	print("-------------------------")
 
-	#ser.write(b'e') # end bit
-'''
+	ser.write(b'e') # end bit
+
 # sentToAccuracyArduino(accuracy) sends accuracy report to Arduino Uno
 def sendToAccuracyArduino(accuracy):
 
@@ -280,7 +276,7 @@ def sendToAccuracyArduino(accuracy):
 			ser.write(str(0).encode())
 
 	print("-------------------------")
-'''
+
 def main():
 	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
 
@@ -298,7 +294,7 @@ def main():
 		accuracy = SUCCESSES / data.shape[0]
 
 		sendToMasterArduino(payloads)
-		#sendToAccuracyArduino(accuracy)
+		sendToAccuracyArduino(accuracy)
 		break
 
 main()
