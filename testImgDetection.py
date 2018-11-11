@@ -34,7 +34,7 @@ def processImg(imgName):
     templates = ["A.JPG", "B.JPG", "C.JPG", "D.JPG"]
     branches = [None] * 7
     for i in range(len(templates)):
-        loc = findLoc(imgName, templates[i], 0.65)
+        loc = findLoc(imgName, templates[i], 0.5)
         for pt in zip(*loc[::-1]):
             x = pt[0]
             y = pt[1]
