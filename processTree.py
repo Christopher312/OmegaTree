@@ -15,10 +15,11 @@ import time
 from PayloadWrapperList import PayloadWrapperList
 from StoragePayloadWrapper import StoragePayloadWrapper
 from Payload import Payload
+#from detect_circles_template import getFeaturesFromImage
 
 DATA_FILE = "iris.csv"
 STORAGE_FILE = "preprocessed_data.txt"
-BRIGHTNESS_SCALE = 9
+BRIGHTNESS_SCALE = 255
 VERSICOLOR = 1
 VIRGINICA = 2
 NUM_NODES = 7
@@ -178,8 +179,6 @@ def classifyNode(cutoffPayloads, index, data):
 # 	 based on featureOrientation at index
 # side effect: updates cutoffs
 def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads):
-	if(index == 14):
-		print "help"
 	if(index < length and featureOrientation[index] != None):
 		cutoffPayloads[index].cutoff, lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
 
@@ -188,13 +187,13 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 			leftData, rightData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data)
 
 			# check if either children is a leaf 
-			if(isLeaf(featureOrientation, 2 * index + 1)):
+			if(isLeaf(featureOrientation, 2 * index + 1)):	
+				classifyNode(cutoffPayloads, 2 * index + 1, leftData)
 				# counts the number of successfuly guessed classifications	
 				countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
-				classifyNode(cutoffPayloads, 2 * index + 1, leftData)
-			if(isLeaf(featureOrientation, 2 * index + 2)):
-				countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
+			if(isLeaf(featureOrientation, 2 * index + 2)):	
 				classifyNode(cutoffPayloads, 2 * index + 2, rightData)
+				countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
 			
 
 			# set weight
@@ -223,15 +222,15 @@ def sendToMasterArduino(payloads):
 
 	# begin writing to serial port
 	print('begin to write') 
-	#ser.write(b's') # start bit
+	ser.write(b's') # start bit
         
 	print("-------------------------")
 	print("Sending weights")
 	# send weights (brightness)
 	for index, payload in enumerate(payloads):
 		if(index != 0):
-			print("Absolute weight (scaled by 9): " + str(BRIGHTNESS_SCALE * payload.absoluteWeight))
-			ser.write(str(int(payload.absoluteWeight * BRIGHTNESS_SCALE)).encode())
+			print("Absolute weight (scaled by 255): ", max(0,(int(BRIGHTNESS_SCALE * payload.absoluteWeight))))
+			ser.write(chr(max(0,(int(payload.absoluteWeight * BRIGHTNESS_SCALE)))))
 
 	print("-------------------------")
 	print("Sending classifications")
@@ -248,6 +247,8 @@ def sendToMasterArduino(payloads):
 
 # sentToAccuracyArduino(accuracy) sends accuracy report to Arduino Uno
 def sendToAccuracyArduino(accuracy):
+	
+	arduinoAccuracySer.write(b's')
 
 	NUM_DIGITS = 4 # standardize number of digits
 
@@ -265,7 +266,7 @@ def sendToAccuracyArduino(accuracy):
 	for index, digit in enumerate(str(accuracy)):
 		if(numDigits < NUM_DIGITS):
 			if(digit != '.'):
-				ser.write(digit.encode())
+				arduinoAccuracySer.write(digit.encode())
 				print ("Digit: " + str(numDigits) + " -> " + str(digit))
 				numDigits = numDigits + 1
 
@@ -273,9 +274,11 @@ def sendToAccuracyArduino(accuracy):
 		for index in range(0, NUM_DIGITS - numDigits):
 			print ("Digit: " + str(numDigits) + " -> " + str(0))
 			numDigits = numDigits + 1
-			ser.write(str(0).encode())
+			arduinoAccuracySer.write(str(0).encode())
 
 	print("-------------------------")
+
+	arduinoAccuracySer.write(b'e')
 
 def main():
 	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
@@ -283,15 +286,17 @@ def main():
 	while(True):
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
+		
+		featureOrientation = [0, 1, 3, 2, 3, 1, 3]
 
-		featureOrientation = 	 [2,
-							  	0, 1,
-							  3, 1, 0, 3,
-				   None, None, None, None, None, None, None, None]
+		#featureOrientation = getFeaturesFromImage(imageName)
+
+		for i in range(0, 8): #8 children
+			featureOrientation.append(None)
 
 		payloads = processTree(featureOrientation, data)
 
-		accuracy = SUCCESSES / data.shape[0]
+		accuracy = SUCCESSES / (1.0 * data.shape[0])
 
 		sendToMasterArduino(payloads)
 		sendToAccuracyArduino(accuracy)
