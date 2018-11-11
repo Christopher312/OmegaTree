@@ -10,21 +10,13 @@ import cv2
 
 # load the image, clone it for output, and then convert it to grayscale
 #filename = 'images/circleTest.jpg'
-#filename = 'newCircleTest.jpg'
-filename = 'crop0final.jpg'
+filename = 'newCircleTest2.jpg'
 W = 1000.
 oriimg = cv2.imread(filename,cv2.CV_LOAD_IMAGE_COLOR)
 height, width, depth = oriimg.shape
 imgScale = W/width
 newX,newY = oriimg.shape[1]*imgScale, oriimg.shape[0]*imgScale
 image = cv2.resize(oriimg,(int(newX),int(newY)))
-
-
-output = image.copy()
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-# detect circles in the image
-circles = cv2.HoughCircles(gray, cv2.cv.CV_HOUGH_GRADIENT, 1.5, 100)#, param2=1) #, param1=128, minRadius=10, maxRadius=50)
  
 def max(x,y):
    if (x>y):
@@ -36,15 +28,22 @@ def sortFunction(r,x,y):
    return max(y-500, 0)**4+ r*r
 
 
-def circle_helper(image):
+def circle_helper(oriimg):
+   W = 1000.
+   height, width, depth = oriimg.shape
+   imgScale = W/width
+   newX,newY = oriimg.shape[1]*imgScale, oriimg.shape[0]*imgScale
+   image = cv2.resize(oriimg,(int(newX),int(newY)))
+ 
    output = image.copy()
    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
    # detect circles in the image
-   circles = cv2.HoughCircles(gray, cv2.cv.CV_HOUGH_GRADIENT, 1, 1,  minRadius=0, maxRadius=20)
+   circles = cv2.HoughCircles(gray, cv2.cv.CV_HOUGH_GRADIENT, 2, 100, maxRadius = 100)#,  minRadius=0, maxRadius=20)
    # ensure at least some circles were found
    if circles is not None:
            # convert the (x, y) coordinates and radius of the circles to integers
            circles = np.round(circles[0, :]).astype("int")
+           print "numCircles detected: ", len(circles)
            # loop over the (x, y) coordinates and radius of the circles
            for (x, y, r) in circles:
                    # draw the circle in the output image, then draw a rectangle
@@ -65,6 +64,11 @@ def circle_helper(image):
 
 
 
+output = image.copy()
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+# detect circles in the image
+circles = cv2.HoughCircles(gray, cv2.cv.CV_HOUGH_GRADIENT, 1.2, 100) #, param1=128, minRadius=10, maxRadius=50)
 # ensure at least some circles were found
 if circles is not None:
 	# convert the (x, y) coordinates and radius of the circles to integers
@@ -85,6 +89,7 @@ if circles is not None:
  	for (x, y, r) in circles:
 		# draw the circle in the output image, then draw a rectangle
 		# corresponding to the center of the circle
+                if (sortFunction(r,x,y)<=radiusList[5]):
 		  cv2.putText(output, str(r)+","+str(x)+","+str(y), (x,y),cv2.FONT_HERSHEY_SIMPLEX, .5, (255,0,0),2) #  Scalar(0,0,255,255), 2)
                   cv2.circle(output, (x, y), r, (0, 255, 0), 4)
 		  cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
@@ -93,20 +98,19 @@ if circles is not None:
                   goodCircleList.append([r,x,y])
 
         counter=0
-
-        """
         for (r,x,y) in goodCircleList:
             print "r: ", r, ", x: ", x,", y: ",y
             print "crop-dim: ","(",x-r,":",x+r,") (",y-r,":",y+r,")"
             crop1 = image[ y-r:y+r, x-r:x+r]
             cv2.imwrite("crop"+str(counter)+".jpg", crop1)
+            print "crop"+str(counter)+" is being processed"
             counter = counter+1
             circle_helper(crop1)
              
 
 
 	# show the output image
-        """
+        
         cv2.imwrite("detect_circles_img.jpg", image)
 	print "wrote image"
         cv2.imshow("output", np.hstack([image, output]))
