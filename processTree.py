@@ -10,6 +10,7 @@ import subprocess
 import serial
 import serial.tools.list_ports
 import os.path
+import time
 
 from PayloadWrapperList import PayloadWrapperList
 from StoragePayloadWrapper import StoragePayloadWrapper
@@ -169,15 +170,17 @@ def filterData(feature, cutoff, data):
 			else:
 				rightData.drop(row_index, inplace=True)
 	return leftData, rightData;
-'''
+
 # sendToArduino(payloads) sends information from the payloads to the arduino
 def sendToArduino(payloads):
+	ser = serial.Serial('com3', 9600)
+	time.sleep(2) # allow serial communication to establish
 
 	# get serial port being used
-	ports = list(serial.tools.list_ports.comports())
-	hiddenSerial = '855393139313517121F1'
-	arduino = [p[0] for p in ports if (hiddenSerial in p[2])]
-	ser = serial.Serial(arduino[0], timeout=0)
+	# ports = list(serial.tools.list_ports.comports())
+	# hiddenSerial = '855393139313517121F1'
+	# arduino = [p[0] for p in ports if (hiddenSerial in p[2])]
+	# ser = serial.Serial(arduino[0], timeout=0)
 
 	# begin writing to serial port
 	ser.write(b's') # start bit
@@ -189,6 +192,7 @@ def sendToArduino(payloads):
 		if(index != 0):
 			print "Absolute weight (scaled by 9): " + str(BRIGHTNESS_SCALE * payload.absoluteWeight)
 			ser.write(str(payload.absoluteWeight * BRIGHTNESS_SCALE).encode())
+			time.sleep(2)
 
 	print "-------------------------"
 	print "Sending classifications"
@@ -198,11 +202,13 @@ def sendToArduino(payloads):
 		if(index != 0):
 			print "Classification: " + str(payload.classification)
 			ser.write(str(payload.classification))
+			time.sleep(2)
 
+	time.sleep(5)
 	print "-------------------------"
 
 	ser.write(b'e') # end bit
-'''
+
 def main():
 	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
 
@@ -210,11 +216,11 @@ def main():
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
 
-		featureOrientation = [0, 1, 2, 1, 3, 1, 4, None, None, None, None, None, None, None, None]
+		featureOrientation = [0, 1, 2, None, 3, 3, 1, None, None, None, None, None, None, None, None]
 
 		payloads = processTree(featureOrientation, data)
 
-		# sendToArduino(payloads)
+		sendToArduino(payloads)
 		break
 
 main()
