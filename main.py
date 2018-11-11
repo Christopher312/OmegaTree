@@ -18,7 +18,8 @@ while True:
 	subprocess.check_output(["raspistill", "-o", filename])
 	print("Parsing photo")
 	featureOrientation = getFeaturesFromImage(filename)
-
+	
+	# featureOrientation = [0, None, 1, None, None, None, 2]
 	print(featureOrientation)
 
 	for i in range(0, 8): # 8 children

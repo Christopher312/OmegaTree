@@ -47,7 +47,6 @@ def computeCutoff(feature, data):
 	lessFalse = True
 	for index, row in data.iterrows():
 		cutoff = row[feature]
-
 		j, lessFalse = getJ(cutoff, feature, data)
 		if(j > bestJ):
 			bestCutoff = cutoff
@@ -57,11 +56,16 @@ def computeCutoff(feature, data):
 def getJ(cutoff, feature, data):
 	# Youden's J Statistic
 	# Returns the correct J, as well as whether to split with less than as negative or positive
-	num1 = 0
-	num2 = 0
-	num3 = 0
-	num4 = 0
+	f = list(data.columns)	
 
+	num1 = sum((data[f[feature]] < cutoff) & (data[f[-1]] == VERSICOLOR))
+	num2 = sum((data[f[feature]] < cutoff) & (data[f[-1]] == VIRGINICA))
+	num3 = sum((data[f[feature]] >= cutoff) & (data[f[-1]] == VERSICOLOR))
+	num4 = sum((data[f[feature]] >= cutoff) & (data[f[-1]] == VIRGINICA))
+	
+
+
+	'''
 	for index, row in data.iterrows():
 		if(row[feature] < cutoff and row[len(row)-1] == VERSICOLOR):
 			num1 += 1
@@ -71,6 +75,7 @@ def getJ(cutoff, feature, data):
 			num3 += 1
 		else:
 			num4 += 1
+	'''
 
 	if(num4 + num2 == 0 or num1 + num3 == 0):
 		#print "error"
@@ -170,13 +175,18 @@ def isLeaf(featureOrientation, index):
 def classifyNode(cutoffPayloads, index, data):
 	type1 = VERSICOLOR
 	type2 = VIRGINICA
+	'''
 	numType1 = 0
 	numType2 = 0
+
 	for row_index, row in data.iterrows():
-		if(row[len(row) - 1] == type1):
+		if(row[-1] == type1):
 			numType1 = numType1 + 1
 		else:
 			numType2 = numType2 + 1
+	'''
+	numType1 = sum(data[' classification'] == VERSICOLOR)
+	numType2 = sum(data[' classification'] == VIRGINICA)
 
 	if(numType1 >= numType2): cutoffPayloads[index].classification = type1
 	else: cutoffPayloads[index].classification = type2
@@ -188,12 +198,13 @@ def classifyNode(cutoffPayloads, index, data):
 def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads):
 	global SUCCESSES
 	if(index < length and featureOrientation[index] != None):
+		a = time.time()
 		cutoffPayloads[index].cutoff, lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
+		print("computeCutoff", time.time() - a)
 
 		# check if children need to be evaluated
 		if(2 * index + 2 < length):
 			leftData, rightData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data)
-
 			# check if either children is a leaf 
 			if(isLeaf(featureOrientation, 2 * index + 1)):	
 				classifyNode(cutoffPayloads, 2 * index + 1, leftData)
@@ -217,13 +228,18 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 # filterData(feature, cutoff, data) filters data based on the feature (index)
 # side effect: updates cutoff dominant trait
 def filterData(feature, cutoff, data):
-	leftData = data.copy()
-	rightData = data.copy()
+	cols = list(data.columns)
+	f = cols[feature]
+
+	leftData = data[data[f] < cutoff]
+	rightData = data[data[f] >= cutoff]
+	'''
 	for row_index, row in data.iterrows():
 			if(row[feature] >= cutoff):
 				leftData.drop(row_index, inplace=True)
 			else:
 				rightData.drop(row_index, inplace=True)
+	'''
 	return leftData, rightData;
 
 # sendToMasterArduino(payloads) sends information from the payloads to the arduino
