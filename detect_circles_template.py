@@ -60,13 +60,13 @@ def getFeaturesFromImage(imageName):
            templateResult.append(loc)
            
            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(loc)
-           print "template ",i,", max_val", max_val
+           # print "template ",i,", max_val", max_val
            resultList.append((-1*max_val,i))
        resultList.sort()
        if ((-1*resultList[0][0])<0.4):
   	  return None  
        resultFeature = resultList[0][1]
-       print "resultFeature: ", resultFeature
+       # print "resultFeature: ", resultFeature
        if (resultFeature==4):
          return None
        return resultFeature
@@ -143,10 +143,4 @@ def getFeaturesFromImage(imageName):
            #cv2.waitKey(0)
            return featureList
 
-def main():
-	for i in range(1000):	
-		subprocess.check_output(["raspistill", "-o", "img" + str(i) + ".jpg"])
-		featureList = getFeaturesFromImage("img"+str(i)+".jpg")
- 		print "featureList: ", featureList
-main()
 

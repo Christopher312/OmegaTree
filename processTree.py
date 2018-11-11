@@ -136,14 +136,21 @@ def storeNewPayloads(cutoffPayloads, featureOrientation):
 #	assumption: featureOrientation stores features as the indices in the data
 #	return: heap of cutoff values
 def processTree(featureOrientation, data):
+	global SUCCESSES
+	SUCCESSES = 0
 	# cutoffPayloads = getOrientationFromFile(featureOrientation)
 	# if(cutoffPayloads != None): return cutoffPayloads
 
 	# orientation not found, must create
 	length = len(featureOrientation) # arbritrary but for our case is 15
 	cutoffPayloads = [Payload() for i in range(length)] # stores cutoffs of each feature
+	print("SUCCBEFORE:", SUCCESSES)
 	getCutoffs(0, length, data, data.shape[0], featureOrientation, cutoffPayloads) # stores cutoffs in cutoffs
-
+	print("SUCCAFTER", SUCCESSES)
+	accuracy = SUCCESSES / (1.0 * data.shape[0])
+	
+	sendToMasterArduino(cutoffPayloads)
+	sendToAccuracyArduino(accuracy)
 	# storeNewPayloads(cutoffPayloads, featureOrientation)
 
 	return cutoffPayloads;
@@ -179,6 +186,7 @@ def classifyNode(cutoffPayloads, index, data):
 # 	 based on featureOrientation at index
 # side effect: updates cutoffs
 def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads):
+	global SUCCESSES
 	if(index < length and featureOrientation[index] != None):
 		cutoffPayloads[index].cutoff, lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
 
@@ -191,10 +199,11 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 				classifyNode(cutoffPayloads, 2 * index + 1, leftData)
 				# counts the number of successfuly guessed classifications	
 				countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
+				print("successes after left count: " + str(SUCCESSES))
 			if(isLeaf(featureOrientation, 2 * index + 2)):	
 				classifyNode(cutoffPayloads, 2 * index + 2, rightData)
 				countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
-			
+				print("successes after right count: " + str(SUCCESSES))
 
 			# set weight
 			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0);
@@ -230,7 +239,10 @@ def sendToMasterArduino(payloads):
 	for index, payload in enumerate(payloads):
 		if(index != 0):
 			print("Absolute weight (scaled by 255): ", max(0,(int(BRIGHTNESS_SCALE * payload.absoluteWeight))))
-			ser.write(chr(max(0,(int(payload.absoluteWeight * BRIGHTNESS_SCALE)))))
+			if((chr(int(payload.absoluteWeight * BRIGHTNESS_SCALE)) == 's')): 
+				ser.write(chr((int(payload.absoluteWeight * BRIGHTNESS_SCALE)) + 1))
+			else:
+				ser.write(chr(max(0,(int(payload.absoluteWeight * BRIGHTNESS_SCALE)))))
 
 	print("-------------------------")
 	print("Sending classifications")
@@ -279,8 +291,9 @@ def sendToAccuracyArduino(accuracy):
 	print("-------------------------")
 
 	arduinoAccuracySer.write(b'e')
-
+'''
 def main():
+	global SUCCESSES
 	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
 
 	while(True):
@@ -294,12 +307,11 @@ def main():
 		for i in range(0, 8): #8 children
 			featureOrientation.append(None)
 
-		payloads = processTree(featureOrientation, data)
+		payloads = processTree(featureOrientation, data.copy())
 
 		accuracy = SUCCESSES / (1.0 * data.shape[0])
 
 		sendToMasterArduino(payloads)
 		sendToAccuracyArduino(accuracy)
 		break
-
-main()
+'''
