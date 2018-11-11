@@ -24,7 +24,7 @@ VIRGINICA = 2
 NUM_NODES = 7
 
 SUCCESSES = 0
-
+'''
 ports = list(serial.tools.list_ports.comports())
 
 hiddenSerial = '557353237353514072A1'
@@ -35,7 +35,7 @@ ser = serial.Serial(arduino[0], timeout=0)
 
 arduinoAccuracy = [p[0] for p in ports if (arduinoAccuracyHiddenSerial in p[2])]
 arduinoAccuracySer = serial.Serial(arduinoAccuracy[0], timeout=0)
-
+'''
 # to find the serial number...
 #for p in ports:
 #	print(p[2])
@@ -158,19 +158,28 @@ def countSuccesses(data, payloads, featureOrientation, index):
 def isLeaf(featureOrientation, index):
 	return featureOrientation[index] == None
 
-# classifyNode(cutoffPayloads, index) classifies node based on dominant trait 
-def classifyNode(cutoffPayloads, index, leftData, rightData):
-	if(leftData.shape[0] >= rightData.shape[0]):
-		cutoffPayloads[2 * index + 1].classification = VERSICOLOR
-		cutoffPayloads[2 * index + 2].classification = VIRGINICA
-	else:
-		cutoffPayloads[2 * index + 1].classification = VIRGINICA
-		cutoffPayloads[2 * index + 2].classification = VERSICOLOR
+# classifyNode(cutoffPayloads, index, data) classifies node based on dominant trait
+def classifyNode(cutoffPayloads, index, data):
+	type1 = VERSICOLOR
+	type2 = VIRGINICA
+	numType1 = 0
+	numType2 = 0
+	for row_index, row in data.iterrows():
+		if(row[len(row) - 1] == type1):
+			numType1 = numType1 + 1
+		else:
+			numType2 = numType2 + 1
+
+	if(numType1 >= numType2): cutoffPayloads[index].classification = type1
+	else: cutoffPayloads[index].classification = type2
+
 
 # getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads) determines cutoff (and children cutoffs)
 # 	 based on featureOrientation at index
 # side effect: updates cutoffs
 def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads):
+	if(index == 14):
+		print "help"
 	if(index < length and featureOrientation[index] != None):
 		cutoffPayloads[index].cutoff, lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
 
@@ -182,10 +191,10 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 			if(isLeaf(featureOrientation, 2 * index + 1)):
 				# counts the number of successfuly guessed classifications	
 				countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
-				classifyNode(cutoffPayloads, index, leftData, rightData)
+				classifyNode(cutoffPayloads, 2 * index + 1, leftData)
 			if(isLeaf(featureOrientation, 2 * index + 2)):
 				countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
-				classifyNode(cutoffPayloads, index, leftData, rightData)
+				classifyNode(cutoffPayloads, 2 * index + 2, rightData)
 			
 
 			# set weight
@@ -218,7 +227,7 @@ def sendToMasterArduino(payloads):
 
 	# begin writing to serial port
 	print('begin to write') 
-	ser.write(b's') # start bit
+	#ser.write(b's') # start bit
         
 	print("-------------------------")
 	print("Sending weights")
@@ -226,7 +235,7 @@ def sendToMasterArduino(payloads):
 	for index, payload in enumerate(payloads):
 		if(index != 0):
 			print("Absolute weight (scaled by 9): " + str(BRIGHTNESS_SCALE * payload.absoluteWeight))
-			ser.write(str(int(payload.absoluteWeight * BRIGHTNESS_SCALE)).encode())
+			#ser.write(str(int(payload.absoluteWeight * BRIGHTNESS_SCALE)).encode())
 
 	print("-------------------------")
 	print("Sending classifications")
@@ -235,12 +244,12 @@ def sendToMasterArduino(payloads):
 	for index, payload in enumerate(payloads):
 		if(index != 0):
 			print("Classification: " + str(payload.classification))
-			ser.write(str(payload.classification).encode())
+			#ser.write(str(payload.classification).encode())
 
 	print("-------------------------")
 
-	ser.write(b'e') # end bit
-
+	#ser.write(b'e') # end bit
+'''
 # sentToAccuracyArduino(accuracy) sends accuracy report to Arduino Uno
 def sendToAccuracyArduino(accuracy):
 
@@ -271,7 +280,7 @@ def sendToAccuracyArduino(accuracy):
 			ser.write(str(0).encode())
 
 	print("-------------------------")
-
+'''
 def main():
 	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
 
@@ -279,14 +288,17 @@ def main():
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
 
-		featureOrientation = [2, 1, 0, 0, 1, 3, 2, None, None, None, None, None, None, None]
+		featureOrientation = 	 [2,
+							  	0, 1,
+							  3, 1, 0, 3,
+				   None, None, None, None, None, None, None, None]
 
 		payloads = processTree(featureOrientation, data)
 
 		accuracy = SUCCESSES / data.shape[0]
 
 		sendToMasterArduino(payloads)
-		sendToAccuracyArduino(accuracy)
+		#sendToAccuracyArduino(accuracy)
 		break
 
 main()
