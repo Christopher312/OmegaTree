@@ -15,11 +15,10 @@ import time
 from PayloadWrapperList import PayloadWrapperList
 from StoragePayloadWrapper import StoragePayloadWrapper
 from Payload import Payload
-#from detect_circles_template import getFeaturesFromImage
 
 DATA_FILE = "iris.csv"
 STORAGE_FILE = "preprocessed_data.txt"
-BRIGHTNESS_SCALE = 255
+BRIGHTNESS_SCALE = 9
 VERSICOLOR = 1
 VIRGINICA = 2
 NUM_NODES = 7
@@ -47,6 +46,7 @@ def computeCutoff(feature, data):
 	lessFalse = True
 	for index, row in data.iterrows():
 		cutoff = row[feature]
+
 		j, lessFalse = getJ(cutoff, feature, data)
 		if(j > bestJ):
 			bestCutoff = cutoff
@@ -56,16 +56,11 @@ def computeCutoff(feature, data):
 def getJ(cutoff, feature, data):
 	# Youden's J Statistic
 	# Returns the correct J, as well as whether to split with less than as negative or positive
-	f = list(data.columns)	
+	num1 = 0
+	num2 = 0
+	num3 = 0
+	num4 = 0
 
-	num1 = sum((data[f[feature]] < cutoff) & (data[f[-1]] == VERSICOLOR))
-	num2 = sum((data[f[feature]] < cutoff) & (data[f[-1]] == VIRGINICA))
-	num3 = sum((data[f[feature]] >= cutoff) & (data[f[-1]] == VERSICOLOR))
-	num4 = sum((data[f[feature]] >= cutoff) & (data[f[-1]] == VIRGINICA))
-	
-
-
-	'''
 	for index, row in data.iterrows():
 		if(row[feature] < cutoff and row[len(row)-1] == VERSICOLOR):
 			num1 += 1
@@ -75,7 +70,6 @@ def getJ(cutoff, feature, data):
 			num3 += 1
 		else:
 			num4 += 1
-	'''
 
 	if(num4 + num2 == 0 or num1 + num3 == 0):
 		#print "error"
@@ -141,21 +135,14 @@ def storeNewPayloads(cutoffPayloads, featureOrientation):
 #	assumption: featureOrientation stores features as the indices in the data
 #	return: heap of cutoff values
 def processTree(featureOrientation, data):
-	global SUCCESSES
-	SUCCESSES = 0
 	# cutoffPayloads = getOrientationFromFile(featureOrientation)
 	# if(cutoffPayloads != None): return cutoffPayloads
 
 	# orientation not found, must create
 	length = len(featureOrientation) # arbritrary but for our case is 15
 	cutoffPayloads = [Payload() for i in range(length)] # stores cutoffs of each feature
-	print("SUCCBEFORE:", SUCCESSES)
 	getCutoffs(0, length, data, data.shape[0], featureOrientation, cutoffPayloads) # stores cutoffs in cutoffs
-	print("SUCCAFTER", SUCCESSES)
-	accuracy = SUCCESSES / (1.0 * data.shape[0])
-	
-	sendToMasterArduino(cutoffPayloads)
-	sendToAccuracyArduino(accuracy)
+
 	# storeNewPayloads(cutoffPayloads, featureOrientation)
 
 	return cutoffPayloads;
@@ -163,58 +150,34 @@ def processTree(featureOrientation, data):
 # countSuccesses(data, payloads) increments successes based on number of successfuly guessed classifications
 def countSuccesses(data, payloads, featureOrientation, index):
 	global SUCCESSES
-	for row_index, row in data.iterrows():
-		if(row[len(row) - 1] == payloads[index].classification):
-			SUCCESSES = SUCCESSES + 1
-
-# isLeaf(featureOrientation, index) checks if leaf node
-def isLeaf(featureOrientation, index):
-	return featureOrientation[index] == None
-
-# classifyNode(cutoffPayloads, index, data) classifies node based on dominant trait
-def classifyNode(cutoffPayloads, index, data):
-	type1 = VERSICOLOR
-	type2 = VIRGINICA
-	'''
-	numType1 = 0
-	numType2 = 0
-
-	for row_index, row in data.iterrows():
-		if(row[-1] == type1):
-			numType1 = numType1 + 1
-		else:
-			numType2 = numType2 + 1
-	'''
-	numType1 = sum(data[' classification'] == VERSICOLOR)
-	numType2 = sum(data[' classification'] == VIRGINICA)
-
-	if(numType1 >= numType2): cutoffPayloads[index].classification = type1
-	else: cutoffPayloads[index].classification = type2
-
+	if(featureOrientation[index] == None):
+		for row_index, row in data.iterrows():
+			if(row[len(row) - 1] == payloads[index].classification):
+				SUCCESSES = SUCCESSES + 1
 
 # getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads) determines cutoff (and children cutoffs)
 # 	 based on featureOrientation at index
 # side effect: updates cutoffs
 def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads):
-	global SUCCESSES
 	if(index < length and featureOrientation[index] != None):
-		a = time.time()
 		cutoffPayloads[index].cutoff, lessFalse = computeCutoff(featureOrientation[index], data) # pass by reference apparently (treats as list I guess?)
-		print("computeCutoff", time.time() - a)
 
 		# check if children need to be evaluated
 		if(2 * index + 2 < length):
 			leftData, rightData = filterData(featureOrientation[index], cutoffPayloads[index].cutoff, data)
-			# check if either children is a leaf 
-			if(isLeaf(featureOrientation, 2 * index + 1)):	
-				classifyNode(cutoffPayloads, 2 * index + 1, leftData)
-				# counts the number of successfuly guessed classifications	
-				countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
-				print("successes after left count: " + str(SUCCESSES))
-			if(isLeaf(featureOrientation, 2 * index + 2)):	
-				classifyNode(cutoffPayloads, 2 * index + 2, rightData)
-				countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
-				print("successes after right count: " + str(SUCCESSES))
+
+			# set dominant trait
+			if(leftData.shape[0] >= rightData.shape[0]):
+				
+				cutoffPayloads[2 * index + 1].classification = VERSICOLOR
+				cutoffPayloads[2 * index + 2].classification = VIRGINICA
+			else:
+				cutoffPayloads[2 * index + 1].classification = VIRGINICA
+				cutoffPayloads[2 * index + 2].classification = VERSICOLOR
+		
+			# does two things: check if it is a leaf node, and if it is, counts the number of successfuly guessed classifications	
+			countSuccesses(leftData, cutoffPayloads, featureOrientation, 2 * index + 1)
+			countSuccesses(rightData, cutoffPayloads, featureOrientation, 2 * index + 2)	
 
 			# set weight
 			cutoffPayloads[2 * index + 1].absoluteWeight = leftData.shape[0] / (dataSize * 1.0);
@@ -228,22 +191,21 @@ def getCutoffs(index, length, data, dataSize, featureOrientation, cutoffPayloads
 # filterData(feature, cutoff, data) filters data based on the feature (index)
 # side effect: updates cutoff dominant trait
 def filterData(feature, cutoff, data):
-	cols = list(data.columns)
-	f = cols[feature]
-
-	leftData = data[data[f] < cutoff]
-	rightData = data[data[f] >= cutoff]
-	'''
+	leftData = data.copy()
+	rightData = data.copy()
 	for row_index, row in data.iterrows():
 			if(row[feature] >= cutoff):
 				leftData.drop(row_index, inplace=True)
 			else:
 				rightData.drop(row_index, inplace=True)
-	'''
 	return leftData, rightData;
 
 # sendToMasterArduino(payloads) sends information from the payloads to the arduino
 def sendToMasterArduino(payloads):
+	# ser = serial.Serial('com3', 9600)
+	# time.sleep(2) # allow serial communication to establish
+
+	# get serial port being used
 
 	# begin writing to serial port
 	print('begin to write') 
@@ -254,11 +216,8 @@ def sendToMasterArduino(payloads):
 	# send weights (brightness)
 	for index, payload in enumerate(payloads):
 		if(index != 0):
-			print("Absolute weight (scaled by 255): ", max(0,(int(BRIGHTNESS_SCALE * payload.absoluteWeight))))
-			if((chr(int(payload.absoluteWeight * BRIGHTNESS_SCALE)) == 's')): 
-				ser.write(chr((int(payload.absoluteWeight * BRIGHTNESS_SCALE)) + 1))
-			else:
-				ser.write(chr(max(0,(int(payload.absoluteWeight * BRIGHTNESS_SCALE)))))
+			print("Absolute weight (scaled by 9): " + str(BRIGHTNESS_SCALE * payload.absoluteWeight))
+			ser.write(str(int(payload.absoluteWeight * BRIGHTNESS_SCALE)).encode())
 
 	print("-------------------------")
 	print("Sending classifications")
@@ -275,59 +234,31 @@ def sendToMasterArduino(payloads):
 
 # sentToAccuracyArduino(accuracy) sends accuracy report to Arduino Uno
 def sendToAccuracyArduino(accuracy):
-	
-	arduinoAccuracySer.write(b's')
-
-	NUM_DIGITS = 4 # standardize number of digits
 
 	print("-------------------------")
 
 	print("Sending accuracy")
-	print("Accuracy: " + str(accuracy)) # precision to 2 decimal pllaces
-
-	accuracy = accuracy * 100 # scale by 100 to be in percent
-
-	if(float(accuracy) >= 100): accuracy = str(99.00)
-	if(float(accuracy) < 10): accuracy = str(0) + str(accuracy)
-
-	numDigits = 0
-	for index, digit in enumerate(str(accuracy)):
-		if(numDigits < NUM_DIGITS):
-			if(digit != '.'):
-				arduinoAccuracySer.write(digit.encode())
-				print ("Digit: " + str(numDigits) + " -> " + str(digit))
-				numDigits = numDigits + 1
-
-	if(numDigits < NUM_DIGITS): # number of digits to have at end
-		for index in range(0, NUM_DIGITS - numDigits):
-			print ("Digit: " + str(numDigits) + " -> " + str(0))
-			numDigits = numDigits + 1
-			arduinoAccuracySer.write(str(0).encode())
+	print("Accuracy: %.2f" %accuracy) # precision to 2 decimal pllaces
+	if(accuracy >= 1): accuracy = 0.99
+	ser.write(("%.2f" %(accuracy * 100)).encode()) # scale for percent
 
 	print("-------------------------")
 
-	arduinoAccuracySer.write(b'e')
-'''
 def main():
-	global SUCCESSES
 	data = pd.read_csv(DATA_FILE, encoding = "utf-8")
 
 	while(True):
 		#subprocess.check_output(["raspistill", "-o", "img.jpg"])
 		# featureOrientation = processImg("img.jpg")
-		
-		featureOrientation = [0, 1, 3, 2, 3, 1, 3]
 
-		#featureOrientation = getFeaturesFromImage(imageName)
+		featureOrientation = [2, 1, 0, 0, 1, 3, 2, None, None, None, None, None, None, None]
 
-		for i in range(0, 8): #8 children
-			featureOrientation.append(None)
+		payloads = processTree(featureOrientation, data)
 
-		payloads = processTree(featureOrientation, data.copy())
-
-		accuracy = SUCCESSES / (1.0 * data.shape[0])
+		accuracy = SUCCESSES / data.shape[0]
 
 		sendToMasterArduino(payloads)
 		sendToAccuracyArduino(accuracy)
 		break
-'''
+
+main()
