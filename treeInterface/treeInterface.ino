@@ -34,7 +34,7 @@ void setup() {
 
   for (int j = 0; j < numPins; j++) {
     digitalWrite(allPins[j], LOW);
-  }  
+  }
 
 
   /*** SERIAL PORT ***/
@@ -42,12 +42,12 @@ void setup() {
   Serial.begin(9600);
   
   // don't wait for serial communication, 
-  // allows for faster matrix display update
   Serial.setTimeout(0);
 }
 
 void setBranch(int branchI, int amount) {
-  analogWrite(edgePins[branchI], (amount * MAX_BRIGHTNESS) / 9);
+  // (amount * MAX_BRIGHTNESS) / 9
+  analogWrite(edgePins[branchI], amount);
 }
 
 void setNode(int nodeI, int mode) {
@@ -77,14 +77,18 @@ void loop() {
     if(in == 's') {
       indBranch = 0;
       indNode = 0;
+
+      /* reset all pins */
+      for (int j = 0; j < numPins; j++) {
+        digitalWrite(allPins[j], LOW);
+      }
     } else if (indBranch < 14) { 
-      setBranch(indBranch, in - '0');
+      setBranch(indBranch, in);
       indBranch++;
     } else if (indNode < 14) {
       setNode(indNode, in - '0');
-      indBranch++;
+      indNode++;
     } else {
-      // expect end of packet 'e'
     }
   }
 }
